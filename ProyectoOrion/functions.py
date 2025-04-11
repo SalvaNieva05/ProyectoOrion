@@ -1,45 +1,51 @@
 import pandas as pd
 import unidecode
+TABLAS = {
+    "1- Marca": "855220395",
+    "2- Modelos": "1559161636",
+    "3- Tractores": "903974325",
+    "4- Cisternas": "1824793552",
+    "5- Flota": "1348809944",
+    "6- Vencimientos": "1737376307",
+    "7- Personal": "1952436154",
+    "8- Vencimientos_Personal": "1551882233",
+    "9- Servicios": "2124342650",
+}
+
+URL_BASE = "https://docs.google.com/spreadsheets/d/1tamP14UUTfn9ZLcR0jbBMGS63Auju1mOKvpEHVs7cxI/export?format=csv&gid="
 
 
-def normalizar(texto):
-    return unidecode.unidecode(str(texto)).strip().lower()
-
-
-def cargar_tabla(tablas):
+def cargar_tabla():
+    """Carga una tabla desde Google Sheets según el diccionario TABLAS"""
     while True:
         print("\nTablas disponibles:")
-        for nombre in tablas:
-            print(f"- {nombre}")
+        for clave in TABLAS:
+            print(clave)
 
-        nombre_tabla = input("Ingrese el nombre exacto de la tabla (o 'm' para volver al menú): ").strip()
-        if nombre_tabla.lower() == 'm':
+        opcion = input("Ingrese el número de la tabla que desea cargar (o 'm' para volver al menú): ").strip()
+
+        if opcion.lower() == 'm':
             return None
 
-        if nombre_tabla in tablas:
-            archivo_csv = tablas[nombre_tabla]
+        tabla_key = next((key for key in TABLAS if key.startswith(opcion + "-")), None)
+
+        if tabla_key:
+            url = URL_BASE + TABLAS[tabla_key]
             try:
-                df = pd.read_csv(archivo_csv)
-                print(f"✅ Tabla '{nombre_tabla}' cargada correctamente.")
+                df = pd.read_csv(url)
+                print(f"\nTabla '{tabla_key}' cargada correctamente.")
                 return df
             except Exception as e:
                 print(f"❌ Error al cargar la tabla: {e}")
         else:
-            print("⚠ Nombre inválido. Intente nuevamente.")
-
-
-def mostrar_todo(df):
-    if df is None:
-        print("⚠ No hay tabla cargada. Cargue una primero.")
-    else:
-        print("\nContenido de la tabla:")
-        print(df)
+            print("⚠ Tabla no encontrada, intente nuevamente.")
 
 
 def ordenar_segun(df):
+    """Ordena la tabla por la columna que el usuario elija."""
     if df is None:
         print("⚠ No hay tabla cargada. Cargue una primero.")
-        return df
+        return
 
     while True:
         print("\nColumnas disponibles para ordenar:")
@@ -47,28 +53,26 @@ def ordenar_segun(df):
 
         columna = input("Ingrese el nombre de la columna para ordenar (o 'm' para volver al menú): ").strip()
         if columna.lower() == 'm':
-            return df
+            return
 
-        columna_normalizada = normalizar(columna)
-        columnas_normalizadas = {normalizar(col): col for col in df.columns}
+        columna_normalizada = unidecode.unidecode(columna).lower()
+        columnas_normalizadas = {unidecode.unidecode(col).lower(): col for col in df.columns}
 
         if columna_normalizada in columnas_normalizadas:
             ascendente = input("¿Orden ascendente? (s/n): ").strip().lower() == 's'
-            try:
-                df = df.sort_values(by=columnas_normalizadas[columna_normalizada], ascending=ascendente)
-                print("\n✅ Tabla ordenada correctamente:")
-                print(df)
-                return df
-            except Exception as e:
-                print(f"❌ Error al ordenar: {e}")
+            df = df.sort_values(by=columnas_normalizadas[columna_normalizada], ascending=ascendente)
+            print("\n✅ Tabla ordenada correctamente:")
+            print(df)
+            return df
         else:
             print("⚠ Columna no encontrada, intente nuevamente.")
 
 
 def modificar_fila(df):
+    """Permite modificar una fila de la tabla."""
     if df is None:
         print("⚠ No hay tabla cargada. Cargue una primero.")
-        return df
+        return
 
     while True:
         print("\nColumnas disponibles para buscar:")
@@ -76,21 +80,18 @@ def modificar_fila(df):
 
         columna = input("Ingrese el nombre de la columna para buscar la fila (o 'm' para volver al menú): ").strip()
         if columna.lower() == 'm':
-            return df
+            return
 
-        columna_normalizada = normalizar(columna)
-        columnas_normalizadas = {normalizar(col): col for col in df.columns}
+        columna_normalizada = unidecode.unidecode(columna).lower()
+        columnas_normalizadas = {unidecode.unidecode(col).lower(): col for col in df.columns}
 
         if columna_normalizada in columnas_normalizadas:
             valor = input(f"Ingrese el valor a buscar en '{columnas_normalizadas[columna_normalizada]}': ").strip()
-            try:
-                coincidencias = df[df[columnas_normalizadas[columna_normalizada]].astype(str).apply(normalizar) == normalizar(valor)]
-                if coincidencias.empty:
-                    print("⚠ No se encontraron coincidencias.")
-                    continue
+            filas = df[df[columnas_normalizadas[columna_normalizada]].astype(str).str.lower() == valor.lower()]
 
+            if not filas.empty:
                 print("\nFilas encontradas:")
-                print(coincidencias)
+                print(filas)
 
                 try:
                     index = int(input("Ingrese el índice de la fila que desea modificar: "))
@@ -101,20 +102,27 @@ def modificar_fila(df):
                         print(", ".join(df.columns))
 
                         columna_modificar = input("Ingrese la columna a modificar: ").strip()
-                        columna_modificar_normalizada = normalizar(columna_modificar)
-
+                        columna_modificar_normalizada = unidecode.unidecode(columna_modificar).lower()
                         if columna_modificar_normalizada in columnas_normalizadas:
-                            nuevo_valor = input(f"Ingrese el nuevo valor para '{columnas_normalizadas[columna_modificar_normalizada]}': ")
+                            nuevo_valor = input(
+                                f"Ingrese el nuevo valor para '{columnas_normalizadas[columna_modificar_normalizada]}': ")
                             df.at[index, columnas_normalizadas[columna_modificar_normalizada]] = nuevo_valor
                             print("✅ Modificación realizada correctamente.")
                             return df
                         else:
-                            print("⚠ Columna no válida.")
+                            print("⚠ Columna no encontrada.")
                     else:
                         print("⚠ Índice fuera de rango.")
                 except ValueError:
-                    print("⚠ Índice inválido.")
-            except Exception as e:
-                print(f"❌ Error al modificar: {e}")
+                    print("⚠ Entrada inválida.")
+            else:
+                print("⚠ No se encontraron resultados.")
         else:
-            print("⚠ Columna no válida.")
+            print("⚠ Columna no encontrada.")
+def mostrar_todo(df):
+    """Muestra la tabla cargada."""
+    if df is None:
+        print("⚠ No hay tabla cargada. Cargue una primero.")
+    else:
+        print("\n📋 Tabla completa:")
+        print(df)
